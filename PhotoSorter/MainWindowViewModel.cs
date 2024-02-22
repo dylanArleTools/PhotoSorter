@@ -67,8 +67,8 @@ namespace PhotoSorter
             Task sortTask = Task.Run(() =>
             {
                 string sourcePath = "";
-                string destPath = "";
-                string tempPath = Path.Combine(Path.GetTempPath(), "PhotoSort");
+                string destinationRoot = "";
+                string temporaryPath = Path.Combine(Path.GetTempPath(), "PhotoSort");
                 // Execute on dispatcher thread to allow access to UI and system resources
                 var fileCopyResult = Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -85,12 +85,12 @@ namespace PhotoSorter
                     }
                     else
                     {
-                        FolderItem fi = (folder as Folder3).Self;
-                        sourceFolder = fi.GetFolder;
-                        sourcePath = fi.Path;
+                        FolderItem folderItem = (folder as Folder3).Self;
+                        sourceFolder = folderItem.GetFolder;
+                        sourcePath = folderItem.Path;
                     }
 
-                    Folder destFolder;
+                    Folder destinationFolder;
                     Folder folder2 = shell.BrowseForFolder((int)Hwnd, "Select directory to sort", 0, 0);
                     if (folder2 == null)
                     {
@@ -100,22 +100,22 @@ namespace PhotoSorter
                     else
                     {
                         FolderItem fi = (folder2 as Folder3).Self;
-                        destFolder = fi.GetFolder;
-                        destPath = fi.Path;
+                        destinationFolder = fi.GetFolder;
+                        destinationRoot = fi.Path;
                     }
 
                     try
                     {
-                        Directory.CreateDirectory(tempPath);
-                        Folder tempFolder = shell.NameSpace(tempPath.Replace(@"\\", @"\"));
-                        tempFolder.CopyHere(sourceFolder.Items());
+                        Directory.CreateDirectory(temporaryPath);
+                        Folder temporaryFolder = shell.NameSpace(temporaryPath.Replace(@"\\", @"\"));
+                        temporaryFolder.CopyHere(sourceFolder.Items());
                     }
                     catch (Exception e)
                     {
                         OutputLabelContent = $"Copy Error: {e}";
-                        if (Directory.Exists(tempPath))
+                        if (Directory.Exists(temporaryPath))
                         {
-                            Directory.Delete(tempPath, true);
+                            Directory.Delete(temporaryPath, true);
                         }
                         return false;
                     }
@@ -128,11 +128,11 @@ namespace PhotoSorter
                     return false;
                 }
 
-                string[] sourceFiles = Directory.GetFiles(tempPath, "*.jpg", SearchOption.AllDirectories);
-                string dupPath = Path.Combine(destPath, $"Duplicates");
-                if (Directory.Exists(dupPath))
+                string[] sourceFiles = Directory.GetFiles(temporaryPath, "*.jpg", SearchOption.AllDirectories);
+                string duplicateRoot = Path.Combine(destinationRoot, $"Duplicates");
+                if (Directory.Exists(duplicateRoot))
                 {
-                    Directory.Delete(dupPath, true);
+                    Directory.Delete(duplicateRoot, true);
                 }
 
                 int copied = 0;
@@ -150,7 +150,7 @@ namespace PhotoSorter
 
                     DateTime date = File.GetLastWriteTime(file);
                     string monthDirectoryName = date.ToString("MM-yyyy");
-                    string destinationPath = Path.Combine(destPath, monthDirectoryName);
+                    string destinationPath = Path.Combine(destinationRoot, monthDirectoryName);
                     Directory.CreateDirectory(destinationPath);
                     string dayDirectoryName = date.ToString("dd");
                     if (DoesSortByDayDatesContain(date))
@@ -161,14 +161,14 @@ namespace PhotoSorter
 
                     if (File.Exists(Path.Combine(destinationPath, Path.GetFileName(file))))
                     {
-                        string duplicateDirectory = Path.Combine(destPath, $"Duplicates\\{monthDirectoryName}");
+                        string duplicateDirectory = Path.Combine(destinationRoot, $"Duplicates\\{monthDirectoryName}");
                         Directory.CreateDirectory(duplicateDirectory);
                         if (DoesSortByDayDatesContain(date))
                         {
                             duplicateDirectory = Path.Combine(duplicateDirectory, dayDirectoryName);
                             Directory.CreateDirectory(duplicateDirectory);
                         }
-                        File.Copy(file, Path.Combine(duplicateDirectory, Path.GetFileName(file)));
+                        File.Copy(file, Path.Combine(duplicateDirectory, Path.GetFileName(file)), true);
                         duplicates++;
                     }
                     else
@@ -186,9 +186,9 @@ namespace PhotoSorter
                     OutputLabelContent = $"{copied} files copied. {duplicates} duplicates already in the destination.";
                 });
 
-                Directory.Delete(tempPath, true);
+                Directory.Delete(temporaryPath, true);
                 // Open Windows Explorer to display the destination directory
-                Process.Start(destPath);
+                Process.Start(destinationRoot);
                 return true;
             }).ContinueWith(
             (t) =>
